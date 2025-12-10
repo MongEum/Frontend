@@ -1,100 +1,99 @@
 import React, { useState } from "react";
 import {
-  View,
+  Alert,
+  Animated,
+  Dimensions,
+  Image,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  Image,
-  Dimensions,
-  StyleSheet,
+  View
 } from "react-native";
-import { Animated, Easing } from "react-native";
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
-import { Play, Heart, Brain, Moon, Sparkles, Calendar } from "lucide-react-native";
 import { useRouter } from "expo-router";
-
+import { Brain, Heart, Moon, Play, Sparkles } from "lucide-react-native";
 const { width } = Dimensions.get("window");
-
-const mockDreams = [
-  {
-    id: "1",
-    date: "2023-05-15",
-    title: "하늘을 나는 꿈",
-    snippet: "푸른 하늘을 날아다니며 자유로움을 느꼈다...",
-    emotion: "Joyful",
-    image:
-      "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=900",
-  },
-  {
-    id: "2",
-    date: "2023-05-10",
-    title: "물고기와 대화하는 꿈",
-    snippet: "바다에서 물고기들과 대화를 나누며...",
-    emotion: "Curious",
-    image:
-      "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=900",
-  },
-  {
-    id: "3",
-    date: "2023-05-05",
-    title: "잃어버린 열쇠",
-    snippet: "중요한 문을 여는 열쇠를 찾아 헤맸다...",
-    emotion: "Anxious",
-    image:
-      "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=900",
-  },
-];
-
+const API_BASE_URL = 'http://192.168.219.138:8080';
+const getYouTubeThumbnail = (url: string) => {
+  if (!url) return "https://via.placeholder.com/150";
+  try {
+    // URL 형식에 따라 비디오 ID 추출 (v=XXXXX)
+    const videoId = url.split('v=')[1]?.split('&')[0];
+    return videoId 
+      ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` 
+      : "https://via.placeholder.com/150";
+  } catch (e) {
+    return "https://via.placeholder.com/150";
+  }
+};
 export default function DreamInterpretationScreen() {
   const router = useRouter();
   const [currentView, setCurrentView] = useState<"input" | "loading" | "results">("input");
   const [dreamInput, setDreamInput] = useState("");
+  const [resultData, setResultData] = useState<any>(null);
 
-  const dreamInterpretation =
-    "Flying in dreams often represents a desire for freedom or breaking away from limitations...";
-  const emotionAnalysis = {
-    primary: "Peaceful",
-    secondary: "Hopeful",
-    description: "Your dream reflects inner tranquility and optimism.",
-  };
-
-  const recommendedMusic = [
-    {
-      id: 1,
-      title: "Stellar Dreams",
-      artist: "Luna Echo",
-      thumbnail:
-        "https://images.unsplash.com/photo-1612232134966-a9b076b9fbe7?w=900",
-    },
-    {
-      id: 2,
-      title: "Midnight Whispers",
-      artist: "Celestial Waves",
-      thumbnail:
-        "https://images.unsplash.com/photo-1584300790099-721339c5116a?w=900",
-    },
-    {
-      id: 3,
-      title: "Ethereal Journey",
-      artist: "Dreamscape Collective",
-      thumbnail:
-        "https://images.unsplash.com/photo-1514539079130-25950c84af65?w=900",
-    },
-  ];
-
-  const handleInterpretDream = () => {
+  const handleInterpretDream = async () => {
     if (!dreamInput.trim()) return;
     setCurrentView("loading");
-    setTimeout(() => setCurrentView("results"), 2500);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await axios.post(
+        `${API_BASE_URL}/api/dreams`,
+        { 
+          title: "새로운 꿈", 
+          content: dreamInput,
+          date: new Date().toISOString()
+        },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json' 
+          }
+        }
+      );
+
+      console.log("✅ 서버 원본 응답:", response.data);
+      const serverItem = response.data.data[0]; 
+      if (!serverItem) throw new Error("분석된 데이터가 없습니다.");
+
+      const mappedData = {
+        interpretation: serverItem.interpretation, 
+        emotion: {
+          primary: serverItem.emotionCategory, 
+          secondary: "AI Analysis", 
+          description: serverItem.emotionalAnalysis 
+        },
+        musicRecommendations: [
+          {
+            id: 1,
+            title: serverItem.recommendedSongName,  
+            artist: serverItem.recommendedArtist,    
+            url: serverItem.recommendedSongUrl,  
+            thumbnail: getYouTubeThumbnail(serverItem.recommendedSongUrl) 
+          }
+        ]
+      };
+
+      setResultData(mappedData);
+      setCurrentView("results");
+
+    } catch (error: any) {
+      console.error("처리 실패:", error);
+      Alert.alert("오류", "꿈 해석 결과를 불러오지 못했습니다.");
+      setCurrentView("input");
+    }
   };
 
   const resetToInput = () => {
     setDreamInput("");
+    setResultData(null);
     setCurrentView("input");
   };
-
   const AnimatedDot = ({ delay }: { delay: number }) => {
     const opacity = React.useRef(new Animated.Value(0.3)).current;
 
@@ -121,11 +120,8 @@ export default function DreamInterpretationScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* -------------------- Input View -------------------- */}
       {currentView === "input" && (
         <ScrollView>
-
-          {/* Header */}
           <LinearGradient colors={["#8A2BE2", "#9370DB"]} style={styles.header}>
             <View style={styles.headerCenter}>
               <Moon size={48} color="#fff" strokeWidth={1.5} />
@@ -135,8 +131,6 @@ export default function DreamInterpretationScreen() {
               </Text>
             </View>
           </LinearGradient>
-
-          {/* Input Section */}
           <View style={styles.section}>
             <View style={styles.block}>
               <Text style={styles.inputTitle}>꿈을 입력하세요</Text>
@@ -172,7 +166,6 @@ export default function DreamInterpretationScreen() {
         </ScrollView>
       )}
 
-      {/* -------------------- Loading View -------------------- */}
       {currentView === "loading" && (
         <View style={styles.loadingScreen}>
           <LinearGradient colors={["#8A2BE2", "#9370DB"]} style={styles.loadingBox}>
@@ -195,8 +188,7 @@ export default function DreamInterpretationScreen() {
         </View>
       )}
 
-      {/* -------------------- Results View -------------------- */}
-      {currentView === "results" && (
+      {currentView === "results" && resultData && (
         <ScrollView>
           {/* Header */}
           <LinearGradient colors={["#8A2BE2", "#9370DB"]} style={styles.resultsHeader}>
@@ -209,39 +201,31 @@ export default function DreamInterpretationScreen() {
           </LinearGradient>
 
           <View style={styles.section}>
-
-            {/* Interpretation Card */}
             <View style={styles.card}>
               <View style={styles.rowCenter}>
                 <Brain size={24} color="#8A2BE2" />
                 <Text style={styles.cardTitle}>꿈 해석</Text>
               </View>
-              <Text style={styles.cardText}>{dreamInterpretation}</Text>
+              <Text style={styles.cardText}>{resultData.interpretation}</Text>           
             </View>
-
-            {/* Emotion Card */}
             <LinearGradient colors={["#A78BFA", "#6366F1"]} style={styles.emotionCard}>
               <View style={styles.rowCenter}>
                 <Heart size={24} color="#fff" />
                 <Text style={styles.emotionCardTitle}>감정 분석</Text>
               </View>
-
               <View style={styles.emotionMainRow}>
-                <Text style={styles.emotionPrimary}>{emotionAnalysis.primary}</Text>
-                <Text style={styles.emotionSecondary}>• {emotionAnalysis.secondary}</Text>
+                <Text style={styles.emotionPrimary}>{resultData.emotion.primary}</Text>
+                <Text style={styles.emotionSecondary}>• {resultData.emotion.secondary}</Text>
               </View>
-
-              <Text style={styles.emotionDesc}>{emotionAnalysis.description}</Text>
+              <Text style={styles.emotionDesc}>{resultData.emotion.description}</Text>            
             </LinearGradient>
-
-            {/* Music */}
             <View style={{ marginBottom: 20 }}>
               <View style={styles.rowCenter}>
                 <Play size={24} color="#8A2BE2" />
                 <Text style={styles.cardTitle}>음악 추천</Text>
               </View>
 
-              {recommendedMusic.map((song) => (
+              {resultData.musicRecommendations.map((song: any, index: number) => (
                 <View key={song.id} style={styles.musicCard}>
                   <Image source={{ uri: song.thumbnail }} style={styles.musicImage} />
 
@@ -270,11 +254,8 @@ export default function DreamInterpretationScreen() {
   );
 }
 
-/* -------------------- Styles -------------------- */
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F5F3FF" },
-
-  /* Input header */
   header: {
     paddingTop: 60,
     paddingBottom: 24,
@@ -290,8 +271,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
   },
-
-  /* Input section */
   section: { paddingHorizontal: 24, paddingVertical: 24 },
   block: { marginBottom: 20 },
   inputTitle: { color: "#4C1D95", fontSize: 24, fontWeight: "700" },
@@ -317,8 +296,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#6D28D9",
   },
   buttonPrimaryText: { color: "#fff", fontSize: 18, fontWeight: "700" },
-
-  /* Loading */
   loadingScreen: {
     flex: 1,
     justifyContent: "center",
@@ -358,8 +335,6 @@ const styles = StyleSheet.create({
     borderColor: "#C4B5FD",
   },
   cancelButtonText: { color: "#6D28D9", fontWeight: "600" },
-
-  /* Results */
   resultsHeader: {
     paddingTop: 60,
     paddingBottom: 24,
@@ -375,8 +350,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 20,
   },
-
-  /* Cards */
   card: {
     backgroundColor: "#fff",
     padding: 20,
@@ -387,8 +360,6 @@ const styles = StyleSheet.create({
   cardTitle: { marginLeft: 8, color: "#4C1D95", fontSize: 20, fontWeight: "700" },
   cardText: { color: "#374151", marginTop: 4, lineHeight: 22 },
   rowCenter: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
-
-  /* Emotion */
   emotionCard: {
     padding: 20,
     borderRadius: 20,
@@ -399,8 +370,6 @@ const styles = StyleSheet.create({
   emotionPrimary: { color: "#fff", fontSize: 26, fontWeight: "800" },
   emotionSecondary: { color: "#EDE9FE", fontSize: 18, marginLeft: 8 },
   emotionDesc: { color: "#fff", lineHeight: 22 },
-
-  /* Music */
   musicCard: {
     flexDirection: "row",
     backgroundColor: "#fff",
@@ -419,7 +388,6 @@ const styles = StyleSheet.create({
     borderRadius: 30,
   },
 
-  /* History Items */
   historyCard: {
     backgroundColor: "#fff",
     padding: 12,

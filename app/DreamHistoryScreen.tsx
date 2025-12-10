@@ -1,80 +1,97 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  Image,
-  TextInput,
-  StyleSheet,
-} from "react-native";
-import { useRouter } from "expo-router";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from "axios";
 import { LinearGradient } from "expo-linear-gradient";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
-  Search,
+  Brain,
   Calendar,
   Heart,
-  Brain,
   Plus,
+  Search,
 } from "lucide-react-native";
+import React, { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from "react-native";
 
-const mockDreams = [
-  {
-    id: "1",
-    date: "2023-05-15",
-    title: "하늘을 나는 꿈",
-    snippet: "푸른 하늘을 날아다니며 자유로움을 느꼈다...",
-    emotion: "Joyful",
-    image:
-      "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=900",
-  },
-  {
-    id: "2",
-    date: "2023-05-10",
-    title: "물고기와 대화하는 꿈",
-    snippet: "바다에서 물고기들과 대화를 나누며...",
-    emotion: "Curious",
-    image:
-      "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=900",
-  },
-  {
-    id: "3",
-    date: "2023-05-05",
-    title: "잃어버린 열쇠",
-    snippet: "중요한 문을 여는 열쇠를 찾아 헤맸다...",
-    emotion: "Anxious",
-    image:
-      "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=900",
-  },
-  {
-    id: "4",
-    date: "2023-04-28",
-    title: "과거의 친구와 재회",
-    snippet: "오랜만에 만난 친구와 함께 시간을 보냈다...",
-    emotion: "Nostalgic",
-    image:
-      "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=900",
-  },
-  {
-    id: "5",
-    date: "2023-04-20",
-    title: "무대 위의 공연",
-    snippet: "수많은 사람들이 있는 무대에서 공연을 했다...",
-    emotion: "Excited",
-    image:
-      "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=900",
-  },
-];
+const API_BASE_URL = 'http://192.168.219.138:8080';
+const getYouTubeThumbnail = (url: string) => {
+  if (!url) return "https://via.placeholder.com/150";
+  try {
+    // youtu.be 단축 URL 등 다양한 케이스 대비 로직 보완
+    let videoId = "";
+    if (url.includes("v=")) {
+      videoId = url.split('v=')[1]?.split('&')[0];
+    } else if (url.includes("youtu.be/")) {
+      videoId = url.split("youtu.be/")[1]?.split("?")[0];
+    }
+    
+    return videoId 
+      ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` 
+      : "https://via.placeholder.com/150";
+  } catch (e) {
+    return "https://via.placeholder.com/150";
+  }
+};
+
+const formatDate = (dateString: string) => {
+  if (!dateString) return "";
+  return dateString.split('T')[0];
+};
 
 export default function DreamHistoryScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
+  const [dreams, setDreams] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const fetchDreams = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        Alert.alert("알림", "로그인이 필요합니다.");
+        return;
+      }
+      const response = await axios.get(`${API_BASE_URL}/api/dreams`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-  const filteredDreams = mockDreams.filter((dream) => {
+      console.log("꿈 목록 로드 성공:", response.data.data.length, "개");
+
+      const mappedDreams = response.data.data.map((item: any) => ({
+        id: item.id.toString(), 
+        date: formatDate(item.createdAt),
+        title: item.title,
+        snippet: item.content, 
+        emotion: item.emotionCategory, 
+        image: getYouTubeThumbnail(item.recommendedSongUrl)
+      }));
+      setDreams(mappedDreams.reverse()); 
+
+    } catch (error) {
+      console.error(" 목록 로드 실패:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useFocusEffect(
+    useCallback(() => {
+      fetchDreams();
+    }, [])
+  );
+  const filteredDreams = dreams.filter((dream) => {
     const matchesSearch =
       dream.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       dream.snippet.toLowerCase().includes(searchQuery.toLowerCase());
+    
     const matchesFilter =
       selectedFilter === "all" ||
       dream.emotion.toLowerCase() === selectedFilter.toLowerCase();
@@ -82,7 +99,14 @@ export default function DreamHistoryScreen() {
     return matchesSearch && matchesFilter;
   });
 
-  const renderDreamItem = ({ item }: { item: (typeof mockDreams)[0] }) => (
+  const handlePressDream = (id: string) => {
+    router.push({
+      pathname: "/DreamDetailScreen",
+      params: { id: id }
+    });
+  };
+
+  const renderDreamItem = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.card}>
       <Image source={{ uri: item.image }} style={styles.cardImage} />
 
@@ -115,7 +139,6 @@ export default function DreamHistoryScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* Header */}
       <LinearGradient
         colors={["#8B5CF6", "#6366F1"]}
         style={styles.header}
@@ -123,7 +146,7 @@ export default function DreamHistoryScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.headerButton}
-            onPress={() => router.push("/DreamInterpretationScreen")}
+            onPress={() => router.back()} 
           >
             <Text style={styles.headerButtonText}>뒤로</Text>
           </TouchableOpacity>
@@ -138,7 +161,6 @@ export default function DreamHistoryScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Search bar */}
         <View style={styles.searchBar}>
           <Search size={20} color="#8A2BE2" />
           <TextInput
@@ -150,12 +172,12 @@ export default function DreamHistoryScreen() {
           />
         </View>
 
-        {/* Filter buttons */}
         <View style={styles.filterRow}>
           {[
             { key: "all", label: "전체" },
-            { key: "joyful", label: "기쁨" },
+            { key: "peaceful", label: "평온" }, 
             { key: "anxious", label: "불안" },
+            { key: "joyful", label: "기쁨" },
           ].map(({ key, label }) => (
             <TouchableOpacity
               key={key}
@@ -178,9 +200,12 @@ export default function DreamHistoryScreen() {
         </View>
       </LinearGradient>
 
-      {/* Dream list */}
       <View style={styles.listWrapper}>
-        {filteredDreams.length > 0 ? (
+        {loading ? (
+           <View style={styles.emptyContainer}>
+             <ActivityIndicator size="large" color="#8B5CF6" />
+           </View>
+        ) : filteredDreams.length > 0 ? (
           <FlatList
             data={filteredDreams}
             renderItem={renderDreamItem}
@@ -201,15 +226,11 @@ export default function DreamHistoryScreen() {
   );
 }
 
-/* ---------------- Styles ---------------- */
-
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: "#F5F3FF",
   },
-
-  /* Header */
   header: {
     paddingTop: 60,
     paddingBottom: 20,
@@ -236,8 +257,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "700",
   },
-
-  /* Search Bar */
   searchBar: {
     flexDirection: "row",
     backgroundColor: "#FFF",
@@ -253,8 +272,6 @@ const styles = StyleSheet.create({
     color: "#4C1D95",
     fontSize: 16,
   },
-
-  /* Filters */
   filterRow: {
     flexDirection: "row",
     marginTop: 14,
@@ -276,15 +293,11 @@ const styles = StyleSheet.create({
   filterButtonTextActive: {
     color: "#6D28D9",
   },
-
-  /* List */
   listWrapper: {
     flex: 1,
     paddingHorizontal: 24,
     paddingVertical: 24,
   },
-
-  /* Card */
   card: {
     flexDirection: "row",
     backgroundColor: "#FFF",
@@ -342,7 +355,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  /* Empty state */
   emptyContainer: {
     flex: 1,
     alignItems: "center",

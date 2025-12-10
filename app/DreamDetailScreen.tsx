@@ -1,24 +1,29 @@
-import React from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from "axios";
+import { LinearGradient } from "expo-linear-gradient";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  Dimensions,
-  StyleSheet,
-} from "react-native";
-import { useRouter } from "expo-router";
-import {
-  Calendar,
-  Heart,
   Brain,
+  Calendar,
+  ChevronLeft,
+  Heart,
   Play,
   Share2,
-  ChevronLeft,
 } from "lucide-react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
 
+const API_BASE_URL = 'http://192.168.219.138:8080';
 const { width } = Dimensions.get("window");
 
 // Mock data
@@ -63,7 +68,49 @@ const mockDreamDetail = {
 
 export default function DreamDetailScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams();
 
+  const [dream, setDream] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDreamDetail = async () => {
+    try {
+      // 저장된 JWT 토큰 가져오기 (구현 방식에 따라 다름)
+      const token = await AsyncStorage.getItem('userToken');
+
+      // GET /api/dreams/{id} 호출
+      const response = await axios.get(`https://your-api-url.com/api/dreams/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}` // JWT 토큰 헤더 포함
+        }
+      });
+
+      setDream(response.data);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("오류", "꿈 정보를 불러오는데 실패했습니다.");
+      router.back(); // 실패 시 뒤로가기
+    } finally {
+      setLoading(false);
+    }
+  };
+useEffect(() => {
+    if (id) {
+      fetchDreamDetail();
+    }
+  }, [id]);
+
+  // 로딩 중일 때 표시
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color="#8B5CF6" />
+      </View>
+    );
+  }
+
+  // 데이터가 없을 때 (혹은 에러)
+  if (!dream) return null;
   return (
     <View style={styles.container}>
       <ScrollView style={{ flex: 1 }}>
