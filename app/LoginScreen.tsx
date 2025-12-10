@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-const API_BASE_URL = 'http://192.168.219.138:8080';
+const API_BASE_URL = 'http://localhost:8080/api';
 
 export default function LoginScreen() {
   const router = useRouter();

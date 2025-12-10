@@ -18,7 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { Brain, Heart, Moon, Play, Sparkles } from "lucide-react-native";
 const { width } = Dimensions.get("window");
-const API_BASE_URL = 'http://192.168.219.138:8080';
+const API_BASE_URL = 'http://localhost:8080/api';
 const getYouTubeThumbnail = (url: string) => {
   if (!url) return "https://via.placeholder.com/150";
   try {

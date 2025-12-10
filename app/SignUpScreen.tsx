@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 
 const { height } = Dimensions.get('window');
-const API_BASE_URL = 'http://192.168.219.138:8080';
+const API_BASE_URL = 'http://localhost:8080/api';
 
 export default function SignUpScreen() {
   const router = useRouter();
