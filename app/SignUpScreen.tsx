@@ -32,10 +32,10 @@ export default function SignUpScreen() {
   const canSignUp = nickname && email && password && confirmPassword && password === confirmPassword && !isLoading;
   
   const handleSignUp = async () => {
-      console.log("canSignUp 상태:", canSignUp); // 이 값이 false로 나오는지 확인
+    console.log("canSignUp 상태:", canSignUp); // 이 값이 false로 나오는지 확인
       if (!canSignUp) {
-          console.log("회원가입 버튼 비활성화: 조건을 충족하지 않음.");
-          return; 
+        console.log("회원가입 버튼 비활성화: 조건을 충족하지 않음.");
+        return; 
       }
       setErrorMessage('');
       setIsLoading(true);
@@ -53,14 +53,8 @@ export default function SignUpScreen() {
           }),
         });
 
-        //const data = await response.json();
-const text = await response.text();
+        const text = await response.text();
         
-        // 2. 로그창에 서버 응답을 출력합니다. (여기서 "Not Found" 등이 뜨는지 확인)
-        console.log("🔥 서버 응답 상태코드:", response.status);
-        console.log("🔥 서버 응답 본문(text):", text);
-
-        // 3. 텍스트를 JSON으로 변환합니다.
         const data = JSON.parse(text);
         if (response.status === 201) {
           Alert.alert("회원가입 성공", data.message || "계정이 성공적으로 생성되었습니다.");

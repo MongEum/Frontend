@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  Alert,
   Animated,
   Dimensions,
   Image,
@@ -31,6 +30,7 @@ const getYouTubeThumbnail = (url: string) => {
     return "https://via.placeholder.com/150";
   }
 };
+
 export default function DreamInterpretationScreen() {
   const router = useRouter();
   const [currentView, setCurrentView] = useState<"input" | "loading" | "results">("input");
@@ -40,51 +40,25 @@ export default function DreamInterpretationScreen() {
   const handleInterpretDream = async () => {
     if (!dreamInput.trim()) return;
     setCurrentView("loading");
+
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await AsyncStorage.getItem('userToken'); 
       const response = await axios.post(
-        `${API_BASE_URL}/api/dreams`,
-        { 
-          title: "새로운 꿈", 
-          content: dreamInput,
-          date: new Date().toISOString()
-        },
-        {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json' 
-          }
-        }
-      );
+        `${API_BASE_URL}/dreams`,
+      {
+        title: "새로운 꿈",
+        content: dreamInput
+      },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+    },
+  }
+);
 
-      console.log("✅ 서버 원본 응답:", response.data);
-      const serverItem = response.data.data[0]; 
-      if (!serverItem) throw new Error("분석된 데이터가 없습니다.");
-
-      const mappedData = {
-        interpretation: serverItem.interpretation, 
-        emotion: {
-          primary: serverItem.emotionCategory, 
-          secondary: "AI Analysis", 
-          description: serverItem.emotionalAnalysis 
-        },
-        musicRecommendations: [
-          {
-            id: 1,
-            title: serverItem.recommendedSongName,  
-            artist: serverItem.recommendedArtist,    
-            url: serverItem.recommendedSongUrl,  
-            thumbnail: getYouTubeThumbnail(serverItem.recommendedSongUrl) 
-          }
-        ]
-      };
-
-      setResultData(mappedData);
-      setCurrentView("results");
-
-    } catch (error: any) {
-      console.error("처리 실패:", error);
-      Alert.alert("오류", "꿈 해석 결과를 불러오지 못했습니다.");
+    } catch (error) {
+      console.error(error);
       setCurrentView("input");
     }
   };

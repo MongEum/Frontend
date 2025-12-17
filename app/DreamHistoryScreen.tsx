@@ -22,6 +22,15 @@ import {
   View
 } from "react-native";
 
+type DreamItem = {
+  id: string;
+  date: string;
+  title: string;
+  snippet: string;
+  emotion: string; // peaceful / anxious / joyful
+  image: string;
+};
+
 const API_BASE_URL = 'http://localhost:8080/api';
 const getYouTubeThumbnail = (url: string) => {
   if (!url) return "https://via.placeholder.com/150";
@@ -54,34 +63,38 @@ export default function DreamHistoryScreen() {
   const [dreams, setDreams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const fetchDreams = async () => {
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        Alert.alert("알림", "로그인이 필요합니다.");
-        return;
-      }
-      const response = await axios.get(`${API_BASE_URL}/api/dreams`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+    if (!token) {
+      Alert.alert("알림", "로그인이 필요합니다.");
+      return;
+    }
 
-      console.log("꿈 목록 로드 성공:", response.data.data.length, "개");
+    const response = await axios.get(`${API_BASE_URL}/api/dreams`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      const mappedDreams = response.data.data.map((item: any) => ({
-        id: item.id.toString(), 
+    const mappedDreams: DreamItem[] = response.data.data.map(
+      (item: any) => ({
+        id: item.id.toString(),
         date: formatDate(item.createdAt),
         title: item.title,
-        snippet: item.content, 
-        emotion: item.emotionCategory, 
-        image: getYouTubeThumbnail(item.recommendedSongUrl)
-      }));
-      setDreams(mappedDreams.reverse()); 
+        snippet: item.content,
+        emotion: item.emotionCategory
+          ? item.emotionCategory.toLowerCase()
+          : "unknown",
+        image: getYouTubeThumbnail(item.recommendedSongUrl),
+      })
+    );
 
-    } catch (error) {
-      console.error(" 목록 로드 실패:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setDreams(mappedDreams.reverse());
+  } catch (error) {
+    console.error("꿈 목록 로드 실패:", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
   useFocusEffect(
     useCallback(() => {
       fetchDreams();
@@ -91,10 +104,10 @@ export default function DreamHistoryScreen() {
     const matchesSearch =
       dream.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       dream.snippet.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const matchesFilter =
       selectedFilter === "all" ||
-      dream.emotion.toLowerCase() === selectedFilter.toLowerCase();
+      dream.emotion === selectedFilter;
 
     return matchesSearch && matchesFilter;
   });
@@ -107,7 +120,10 @@ export default function DreamHistoryScreen() {
   };
 
   const renderDreamItem = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.card}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => handlePressDream(item.id)}
+    >
       <Image source={{ uri: item.image }} style={styles.cardImage} />
 
       <View style={styles.cardContent}>
